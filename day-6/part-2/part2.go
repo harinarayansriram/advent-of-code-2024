@@ -14,41 +14,10 @@ type guard struct {
 	dj int
 }
 
-func fillFrom(i_i, j_i, i_f, j_f int, locations [][]bool) {
-	di := 0
-	if i_f > i_i {
-		di = 1
-	}
-	if i_f < i_i {
-		di = -1
-	}
-	dj := 0
-	if j_f > j_i {
-		dj = 1
-	}
-	if j_f < j_i {
-		dj = -1
-	}
-	i := i_i
-	j := j_i
-	for i != i_f || j != j_f {
-		locations[i][j] = true
-		i += di
-		j += dj
-	}
-	locations[i][j] = true
-}
+func loops(old_obstacleIJ map[int][]int, old_obstacleJI map[int][]int, o_i int, o_j int, guard guard) bool {
+	obstacleIJ := make(map[int][]int, len(old_obstacleIJ))
+	obstacleJI := make(map[int][]int, len(old_obstacleJI))
 
-
-func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI map[int][]int, o_i int, o_j int, guard guard) bool {
-	// fmt.Println("loop?", o_i, o_j)
-	obstacleIJ := make(map[int][]int, 0)
-	obstacleJI := make(map[int][]int, 0)
-	locations := make([][]bool, len(old_locations))
-	for i := range locations {
-		locations[i] = make([]bool, len(old_locations[0]))
-		copy(locations[i], old_locations[i])
-	}
 	for i, obstacles := range old_obstacleIJ {
 		obstacleIJ[i] = make([]int, len(obstacles))
 		copy(obstacleIJ[i], obstacles)
@@ -66,19 +35,14 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 
 	visited := make(map[string]bool)
 
-	leftTheRoom := false
 	// turning: up -> right -> down -> left
 	for {
-		locations[guard.i][guard.j] = true
 		// up, so find largest value in obstacleJI[guard.j] that is less than guard.i
 		if guard.di == -1 && guard.dj == 0 {
 			col_obstacles := obstacleJI[guard.j]
 			o_list_i, _ := slices.BinarySearch(col_obstacles, guard.i)
 			if o_list_i == 0 {
-				// fill to the start of the column
-				fillFrom(guard.i, guard.j, 0, guard.j, locations)
-				leftTheRoom = true
-				break
+				return false
 			}
 
 			o_i := col_obstacles[o_list_i-1]
@@ -88,8 +52,6 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 				return true
 			}
 			visited[stateKey] = true
-
-			fillFrom(guard.i, guard.j, o_i+1, guard.j, locations)
 
 			guard.i = o_i + 1
 			// guard.j = guard.j
@@ -103,10 +65,7 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 			row_obstacles := obstacleIJ[guard.i]
 			o_list_j, _ := slices.BinarySearch(row_obstacles, guard.j)
 			if o_list_j == len(row_obstacles) {
-				// fill to the end of the row
-				fillFrom(guard.i, guard.j, guard.i, len(locations[0])-1, locations)
-				leftTheRoom = true
-				break
+				return false
 			}
 
 			o_j := row_obstacles[o_list_j]
@@ -116,8 +75,6 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 				return true
 			}
 			visited[stateKey] = true
-
-			fillFrom(guard.i, guard.j, guard.i, o_j-1, locations)
 
 			// guard.i = guard.i
 			guard.j = o_j - 1
@@ -131,10 +88,7 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 			col_obstacles := obstacleJI[guard.j]
 			o_list_i, _ := slices.BinarySearch(col_obstacles, guard.i)
 			if o_list_i == len(col_obstacles) {
-				// fill to the end of the column
-				fillFrom(guard.i, guard.j, len(locations)-1, guard.j, locations)
-				leftTheRoom = true
-				break
+				return false
 			}
 
 			o_i := col_obstacles[o_list_i]
@@ -144,8 +98,6 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 				return true
 			}
 			visited[stateKey] = true
-
-			fillFrom(guard.i, guard.j, o_i-1, guard.j, locations)
 
 			guard.i = o_i - 1
 			// guard.j = guard.j
@@ -159,10 +111,7 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 			row_obstacles := obstacleIJ[guard.i]
 			o_list_j, _ := slices.BinarySearch(row_obstacles, guard.j)
 			if o_list_j == 0 {
-				// fill to the start of the row
-				fillFrom(guard.i, guard.j, guard.i, 0, locations)
-				leftTheRoom = true
-				break
+				return false
 			}
 
 			o_j := row_obstacles[o_list_j-1]
@@ -173,16 +122,12 @@ func loops(old_locations [][]bool, old_obstacleIJ map[int][]int, old_obstacleJI 
 			}
 			visited[stateKey] = true
 
-			fillFrom(guard.i, guard.j, guard.i, o_j+1, locations)
-
 			// guard.i = guard.i
 			guard.j = o_j + 1
 			guard.di = -1
 			guard.dj = 0
-			continue
 		}
 	}
-	return !leftTheRoom
 }
 func Run() {
 	data, err := os.ReadFile("./input.txt")
@@ -195,10 +140,8 @@ func Run() {
 	guard := guard{0, 0, -1, 0}
 
 	rows := strings.Split(string(data), "\r\n")
-	locations := make([][]bool, len(rows))
 
 	for i, row := range rows {
-		locations[i] = make([]bool, len(row))
 		for j, loc := range row {
 			if loc == '#' {
 				if obstacleIJ[i] == nil {
@@ -225,9 +168,9 @@ func Run() {
 	}
 
 	total := 0
-	for i := 0; i < len(locations); i++ {
-		for j := 0; j < len(locations[i]); j++ {
-			if !locations[i][j] && (i != guard.i || j != guard.j) && loops(locations, obstacleIJ, obstacleJI, i, j, guard) {
+	for i := 0; i < len(rows); i++ {
+		for j := 0; j < len(rows[0]); j++ {
+			if rows[i][j] != '#' && rows[i][j] != '^' && loops(obstacleIJ, obstacleJI, i, j, guard) {
 				total += 1
 			}
 		}
